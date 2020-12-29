@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+// package learnrpc;
+
+// option go_package = "github.com/calvinrzachman/rpc-playground/rpc";
+
+message MessageInterceptRequest {
+    string clientID = 1;
+    int64 firstCriteria = 2;
+    int64 secondCriteria = 3;
+}
+
+message MessageInterceptResponse {
+    // Whether or not the client accepts the channel.
+    bool accept = 1;
+
+    /*
+    An optional error to send the initiating party to indicate why the message was rejected
+    */
+    string error = 2;
+}
+
+service RPCPlayground {
+    /**
+    A bi-directional stream of of messages.
+    MessageInterceptor dispatches a bi-directional streaming RPC in which
+    MessageIntercept requests are sent to the client and the client replies with
+    a message instructing the server on how to proceed. This allows
+    clients to specify their own criteria for processing messages
+    through a single persistent connection.
+    */
+    rpc MessageInterceptor (stream MessageInterceptRequest) returns (stream MessageInterceptResponse);
+    /*
+    ChannelAcceptor dispatches a bi-directional streaming RPC in which
+    OpenChannel requests are sent to the client and the client responds with
+    a boolean that tells LND whether or not to accept the channel. This allows
+    node operators to specify their own criteria for accepting inbound channels
+    through a single persistent connection.
+    */
+    // rpc ChannelAcceptor (stream ChannelAcceptResponse)
+    //     returns (stream ChannelAcceptRequest);
+}
