@@ -47,11 +47,12 @@ func (r *Initiator) Run() {
 	errorChan := make(chan error)
 
 	// Pure Receive Loop/Routine
-	go receiveLoop(r.requests, errorChan)
+	go receiveLoop(errorChan)
 
 	// Pure Send Loop/Routine
-        // The r.requests channel has previously been shared with some 
-        // other (likely stateful) portion of our program (the message initiator). 
+        // This routine sends messages as it receives them from the r.requests channel.
+	// The r.requests channel has previously been shared with some other (likely stateful)
+	// portion of our program (the message initiator). 
 	sendLoop(r.requests, errorChan)
   
 }
