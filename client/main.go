@@ -121,19 +121,25 @@ func main() {
 	c.sendLoop(requests, errorChan)
 }
 
+// receiveLoop receives messages as they are streamed from the RPC server.
+// In this case messages are simply logged.
+//
+// NOTE: intended to be run as a go routine - errors are surfaced via a channel to the main routine
 func (c *learnRPCClient) receiveLoop(resp chan learnrpc.MessageInterceptResponse, errChan chan error) {
 
 	for {
 		msg, err := c.stream.Recv()
 		if err == io.EOF {
-			errChan <- err
+			log.Printf("[inside Receive Routine]: server has closed the connection +%v\n", err)
 			return
 		}
 		if err != nil {
 			log.Printf("[inside Receive Routine]: encountered error - %+v", err)
-			// close(c.done)
-			errChan <- err
-			return
+			select {
+			case errChan <- err:
+				return
+			case <-c.done:
+			}
 		}
 		log.Printf("[inside Receive Routine]: %s\n", msg.Error)
 
@@ -148,6 +154,11 @@ func (c *learnRPCClient) receiveLoop(resp chan learnrpc.MessageInterceptResponse
 	}
 }
 
+// sendLoop receives messages from some other part of our software via the 'messages'
+// channel and forwards them to the RPC server.
+// We also surface any errors encountered during sending/receiving to the RPC driver routine.
+//
+// NOTE: intended to be run by the driver routine for the MessageInterceptor RPC directly.
 func (c *learnRPCClient) sendLoop(req chan learnrpc.MessageInterceptRequest, errChan chan error) error {
 	// Close the done channel to indicate that the interceptor is no longer
 	// listening and any in-progress requests should be terminated.
@@ -165,14 +176,16 @@ func (c *learnRPCClient) sendLoop(req chan learnrpc.MessageInterceptRequest, err
 				log.Println("[inside Send Routine]: error during sen - ", err)
 				return err
 			}
-		// UNUSED: Would be used if client processed messages from server and returned them, but for now
-		// we just print any reply from the RPC server.
-		case msg := <-req:
-			log.Printf("[inside Send Routine]: Received completed request from worker - %+v Sending response...\n", msg)
-			err := c.stream.Send(&msg)
-			if err != nil {
-				return err
-			}
+
+		// // UNUSED: Would be used if client processed messages from server and returned them, but for now
+		// // we just print any reply from the RPC server.
+		// case msg := <-req:
+		// 	log.Printf("[inside Send Routine]: Received completed request from worker - %+v Sending response...\n", msg)
+		// 	err := c.stream.Send(&msg)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+
 		case err := <-errChan:
 			log.Println("[inside Send Routine]: error from Receive Routine")
 			return err
@@ -180,7 +193,7 @@ func (c *learnRPCClient) sendLoop(req chan learnrpc.MessageInterceptRequest, err
 	}
 }
 
-// sendMsgOnEnter blocks and initiates a message upon input from user
+// sendMsgOnEnter blocks and initiates a message upon input from user.
 func (c *learnRPCClient) sendMsgOnEnter(req learnrpc.MessageInterceptRequest) error {
 	log.Println("[inside sendMsgOnEnter]: Press ENTER to send a message")
 
@@ -205,8 +218,8 @@ func (c *learnRPCClient) sendMsgOnEnter(req learnrpc.MessageInterceptRequest) er
 
 // asyncUserInput spins a go routine which waits for a single byte of user input
 // and writes any input received to a channel. We return the channel immediately
-// so that it may be used in the select statement to prevent hanging waiting for
-// user input in the event our RPC routines end.
+// so that it may be used in the select statement of 'sendMsgOnEnter' to prevent
+// hanging waiting for user input in the event our RPC routines end.
 func (c *learnRPCClient) asyncUserInput() chan byte {
 	asyncChan := make(chan byte)
 

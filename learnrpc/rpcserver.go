@@ -71,8 +71,8 @@ func (i *interceptor) run() error {
 	responses := make(chan MessageInterceptResponse)
 	errorChan := make(chan error)
 
-	i.wg.Add(1)
 	// Pure Receive Loop
+	i.wg.Add(1)
 	go func() {
 		i.receiveLoop(requests, errorChan)
 		i.wg.Done()
@@ -92,6 +92,10 @@ func (i *interceptor) run() error {
 	return i.sendLoop(responses, errorChan)
 }
 
+// receiveLoop receives messages as they are streamed from the RPC client. Messages are sent via
+// Go channel to a set of worker go routines for validation/proccessing.
+//
+// NOTE: intended to be run as a go routine - errors are surfaced via a channel to the main routine
 func (i *interceptor) receiveLoop(req chan MessageInterceptRequest, errChan chan error) {
 
 	ctx := i.stream.Context()
@@ -100,7 +104,11 @@ func (i *interceptor) receiveLoop(req chan MessageInterceptRequest, errChan chan
 		msg, err := i.stream.Recv()
 		if err != nil {
 			log.Printf("[inside Receive Routine]: error on receive %+v", err)
-			errChan <- err
+			// Surface error to main routine if possible before exiting
+			select {
+			case errChan <- err:
+			default:
+			}
 			return
 		}
 		log.Println("[inside Receive Routine]: Received message from client! Sending to worker!")
@@ -131,6 +139,11 @@ func (i *interceptor) receiveLoop(req chan MessageInterceptRequest, errChan chan
 	}
 }
 
+// sendLoop receives messages which have completed processing by worker routines
+// and sends responses back to the RPC client.
+// We also surface any errors encountered during sending/receiving to the RPC driver routine
+//
+// NOTE: intended to be run by the driver routine for the MessageInterceptor RPC directly.
 func (i *interceptor) sendLoop(resp chan MessageInterceptResponse, errChan chan error) error {
 	// Close the done channel to indicate that the interceptor is no longer
 	// listening and any in-progress requests should be terminated.
