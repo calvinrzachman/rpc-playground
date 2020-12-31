@@ -1,6 +1,6 @@
 # rpc-playground
 
-The RPC Playground is intended for use in learning how to use gRPC. Primary focus is given to understanding the structure of bi-directional streams between client and server.
+The RPC Playground is intended for use in learning how to use gRPC. Primary focus is given to understanding how the client and server implementation structure of bi-directional gRPC streams.
 
 Paradigm:
 - RPC Driver/Main Method
