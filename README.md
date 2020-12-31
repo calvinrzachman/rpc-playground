@@ -50,8 +50,8 @@ func (r *Initiator) Run() {
 	go receiveLoop(r.requests, errorChan)
 
 	// Pure Send Loop/Routine
-  // The r.requests channel pipes RPC messages from has previously been shared with some 
-  // other (likely stateful) portion of our program (the message initiator). 
+        // The r.requests channel has previously been shared with some 
+        // other (likely stateful) portion of our program (the message initiator). 
 	sendLoop(r.requests, errorChan)
   
 }
